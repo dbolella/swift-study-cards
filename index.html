@@ -134,7 +134,15 @@
     // Due first (most overdue first), then the rest.
     queue.sort((a, b) => st(a.id).due - st(b.id).due);
     current = queue[0] || null;
+  }
+
+  // Rebuild queue + move to a fresh (unflipped) card. Use on filter change,
+  // grading, reset, init — NOT on flip (flip is a pure repaint via render()).
+  function refresh() {
+    rebuildQueue();
     flipped = false;
+    updateCounts();
+    render();
   }
 
   function updateCounts() {
@@ -153,25 +161,22 @@
     const days = INTERVALS[s.box];
     s.due = g === "again" ? now() + 60000 : now() + Math.max(days, g === "hard" ? 0.5 : days) * DAY;
     save();
-    render();
+    refresh();
   }
 
   function resetProgress() {
     if (!confirm("Reset all review progress on this device? (Cards themselves are kept.)")) return;
-    state = {}; save(); render();
+    state = {}; save(); refresh();
   }
 
   function render() {
-    rebuildQueue();
-    updateCounts();
-
     if (!current) {
       el.main.innerHTML = `<div class="empty"><div style="font-size:34px">🎉</div>
         <div>All caught up in <b>${el.cat.value}</b>${el.dueOnly.checked ? " (due cards)" : ""}.</div>
         <button id="showAll">Review the whole category anyway</button></div>`;
       el.footer.innerHTML = `<div style="text-align:center"><a class="reset" href="#" id="reset">reset progress</a></div>`;
       const showAll = document.getElementById("showAll");
-      if (showAll) showAll.onclick = () => { el.dueOnly.checked = false; render(); };
+      if (showAll) showAll.onclick = () => { el.dueOnly.checked = false; refresh(); };
       document.getElementById("reset").onclick = (e) => { e.preventDefault(); resetProgress(); };
       return;
     }
@@ -218,14 +223,14 @@
       if (map[e.code]) { e.preventDefault(); grade(map[e.code]); } }
   });
 
-  el.cat.onchange = render;
-  el.dueOnly.onchange = render;
+  el.cat.onchange = refresh;
+  el.dueOnly.onchange = refresh;
 
   if (!cards.length) {
     el.main.innerHTML = `<div class="empty">No cards found. Add some to <code>cards.js</code>.</div>`;
   } else {
     buildCatMenu();
-    render();
+    refresh();
   }
 })();
 </script>
