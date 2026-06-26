@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1020" />
+<title>Swift Study Cards</title>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #151b30; --panel2: #1d2542; --ink: #e8ecf8;
+    --muted: #9aa6c8; --line: #2a3354; --accent: #5b8cff;
+    --again: #ff6b6b; --hard: #ffa94d; --good: #51cf66; --easy: #4dabf7;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system,
+    BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    display: flex; flex-direction: column; min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  header {
+    display: flex; gap: 10px; align-items: center; padding: 12px 16px;
+    border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  select, button { font: inherit; color: var(--ink); }
+  select {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 7px 10px; max-width: 56vw;
+  }
+  .counts { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .counts b { color: var(--ink); }
+  .toggle { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+  main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card {
+    width: 100%; max-width: 640px; min-height: 320px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 20px; padding: 26px 24px;
+    display: flex; flex-direction: column; cursor: pointer; user-select: none;
+    box-shadow: 0 18px 50px rgba(0,0,0,.35);
+  }
+  .meta { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .chip {
+    font-size: 11px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase;
+    color: var(--accent); background: rgba(91,140,255,.12); border: 1px solid rgba(91,140,255,.3);
+    padding: 3px 9px; border-radius: 999px;
+  }
+  .chip.tag { color: var(--muted); background: transparent; border-color: var(--line); text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .side-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .content { font-size: 18px; white-space: pre-wrap; word-break: break-word; }
+  .content.answer { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 15.5px; line-height: 1.6; }
+  .hint { margin-top: auto; padding-top: 18px; color: var(--muted); font-size: 13px; text-align: center; }
+  .src { margin-top: 14px; color: var(--muted); font-size: 11.5px; }
+
+  footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+  .grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 640px; margin: 0 auto; }
+  .grades button {
+    border: 1px solid var(--line); background: var(--panel2); border-radius: 12px;
+    padding: 12px 6px; font-weight: 650; cursor: pointer; display: flex;
+    flex-direction: column; align-items: center; gap: 3px;
+  }
+  .grades button small { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .grades button:active { transform: translateY(1px); }
+  .grades button[data-g="again"] { border-color: var(--again); }
+  .grades button[data-g="hard"]  { border-color: var(--hard); }
+  .grades button[data-g="good"]  { border-color: var(--good); }
+  .grades button[data-g="easy"]  { border-color: var(--easy); }
+  .flip-btn { display: block; width: 100%; max-width: 640px; margin: 0 auto; padding: 14px;
+    border: 1px solid var(--accent); background: rgba(91,140,255,.12); color: var(--ink);
+    border-radius: 12px; font-weight: 650; cursor: pointer; }
+  .empty { text-align: center; color: var(--muted); }
+  .empty button { margin-top: 14px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); cursor: pointer; }
+  a.reset { color: var(--muted); font-size: 12px; text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📇 Swift Study Cards</h1>
+  <select id="cat" aria-label="Category"></select>
+  <label class="toggle"><input type="checkbox" id="dueOnly" checked /> due only</label>
+  <span class="counts" id="counts"></span>
+</header>
+
+<main id="main"></main>
+
+<footer id="footer"></footer>
+
+<script src="cards.js"></script>
+<script>
+(function () {
+  "use strict";
+  const STORE = "ip-flash-srs-v1";
+  // Box intervals in days (Leitner-ish). Index = box level.
+  const INTERVALS = [0, 1, 3, 7, 16, 35, 75];
+  const DAY = 86400000;
+
+  const cards = (window.CARDS || []).slice();
+  let state = load();
+  let queue = [];
+  let current = null;
+  let flipped = false;
+
+  const el = {
+    cat: document.getElementById("cat"),
+    dueOnly: document.getElementById("dueOnly"),
+    counts: document.getElementById("counts"),
+    main: document.getElementById("main"),
+    footer: document.getElementById("footer"),
+  };
+
+  function load() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; } }
+  function save() { localStorage.setItem(STORE, JSON.stringify(state)); }
+  function now() { return new Date().getTime(); }
+  function st(id) { return state[id] || (state[id] = { box: 0, due: 0 }); } // due 0 ⇒ new ⇒ due now
+
+  function categories() {
+    const set = new Set(cards.map(c => c.category));
+    return ["All", ...Array.from(set).sort()];
+  }
+  function buildCatMenu() {
+    el.cat.innerHTML = categories().map(c => `<option>${c}</option>`).join("");
+  }
+  function inFilter(c) {
+    const cat = el.cat.value;
+    return cat === "All" || c.category === cat;
+  }
+  function isDue(c) { return st(c.id).due <= now(); }
+
+  function rebuildQueue() {
+    const dueOnly = el.dueOnly.checked;
+    queue = cards.filter(c => inFilter(c) && (!dueOnly || isDue(c)));
+    // Due first (most overdue first), then the rest.
+    queue.sort((a, b) => st(a.id).due - st(b.id).due);
+    current = queue[0] || null;
+    flipped = false;
+  }
+
+  function updateCounts() {
+    const inCat = cards.filter(inFilter);
+    const due = inCat.filter(isDue).length;
+    el.counts.innerHTML = `<b>${due}</b> due &middot; <b>${inCat.length}</b> total`;
+  }
+
+  function grade(g) {
+    if (!current) return;
+    const s = st(current.id);
+    if (g === "again") s.box = 0;
+    else if (g === "hard") s.box = Math.max(0, s.box); // hold level
+    else if (g === "good") s.box = Math.min(INTERVALS.length - 1, s.box + 1);
+    else if (g === "easy") s.box = Math.min(INTERVALS.length - 1, s.box + 2);
+    const days = INTERVALS[s.box];
+    s.due = g === "again" ? now() + 60000 : now() + Math.max(days, g === "hard" ? 0.5 : days) * DAY;
+    save();
+    render();
+  }
+
+  function resetProgress() {
+    if (!confirm("Reset all review progress on this device? (Cards themselves are kept.)")) return;
+    state = {}; save(); render();
+  }
+
+  function render() {
+    rebuildQueue();
+    updateCounts();
+
+    if (!current) {
+      el.main.innerHTML = `<div class="empty"><div style="font-size:34px">🎉</div>
+        <div>All caught up in <b>${el.cat.value}</b>${el.dueOnly.checked ? " (due cards)" : ""}.</div>
+        <button id="showAll">Review the whole category anyway</button></div>`;
+      el.footer.innerHTML = `<div style="text-align:center"><a class="reset" href="#" id="reset">reset progress</a></div>`;
+      const showAll = document.getElementById("showAll");
+      if (showAll) showAll.onclick = () => { el.dueOnly.checked = false; render(); };
+      document.getElementById("reset").onclick = (e) => { e.preventDefault(); resetProgress(); };
+      return;
+    }
+
+    const c = current;
+    const tags = (c.tags || []).map(t => `<span class="chip tag">${t}</span>`).join("");
+    el.main.innerHTML = `
+      <div class="card" id="card">
+        <div class="meta"><span class="chip">${c.category}</span>${tags}</div>
+        <div class="side-label">${flipped ? "Answer" : "Question"}</div>
+        <div class="content ${flipped ? "answer" : ""}">${esc(flipped ? c.back : c.front)}</div>
+        ${flipped && c.source ? `<div class="src">source: ${esc(c.source)}</div>` : ""}
+        ${!flipped ? `<div class="hint">tap card or press <b>Space</b> to flip</div>` : ""}
+      </div>`;
+    document.getElementById("card").onclick = () => { if (!flipped) { flipped = true; render(); } };
+
+    el.footer.innerHTML = flipped
+      ? `<div class="grades">
+           <button data-g="again">Again<small>&lt;1 min</small></button>
+           <button data-g="hard">Hard<small>~12h</small></button>
+           <button data-g="good">Good<small>${human(st(c.id).box + 1)}</small></button>
+           <button data-g="easy">Easy<small>${human(st(c.id).box + 2)}</small></button>
+         </div>`
+      : `<button class="flip-btn" id="flip">Show answer</button>`;
+
+    if (flipped) {
+      el.footer.querySelectorAll(".grades button").forEach(b => b.onclick = () => grade(b.dataset.g));
+    } else {
+      document.getElementById("flip").onclick = () => { flipped = true; render(); };
+    }
+  }
+
+  function human(box) {
+    const d = INTERVALS[Math.min(box, INTERVALS.length - 1)];
+    return d >= 1 ? `${d}d` : "soon";
+  }
+  function esc(s) { return String(s).replace(/[&<>]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m])); }
+
+  // Keyboard: Space/Enter flips; 1-4 grade after flip.
+  document.addEventListener("keydown", (e) => {
+    if (!current) return;
+    if (!flipped && (e.code === "Space" || e.code === "Enter")) { e.preventDefault(); flipped = true; render(); return; }
+    if (flipped) { const map = { Digit1: "again", Digit2: "hard", Digit3: "good", Digit4: "easy" };
+      if (map[e.code]) { e.preventDefault(); grade(map[e.code]); } }
+  });
+
+  el.cat.onchange = render;
+  el.dueOnly.onchange = render;
+
+  if (!cards.length) {
+    el.main.innerHTML = `<div class="empty">No cards found. Add some to <code>cards.js</code>.</div>`;
+  } else {
+    buildCatMenu();
+    render();
+  }
+})();
+</script>
+</body>
+</html>
