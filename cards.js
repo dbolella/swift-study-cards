@@ -59,5 +59,23 @@ window.CARDS = [
     tags: ["complexity", "analysis", "swift-cost-model"],
     source: "LC3 coding dry-run 2026-06-25",
     created: "2026-06-25"
+  },
+  {
+    id: "complexity-amortized-two-pointer",
+    category: "Complexity & Reasoning",
+    front: "A sliding-window / two-pointer solution has a `while` loop nested inside a `for` loop. Why is it O(n), not O(n²)?",
+    back: "Amortized analysis. The left pointer only ever moves FORWARD, at most n times total across the whole run — so the inner while loop's iterations, summed over all outer iterations, is ≤ n. Total: O(n) + O(n) = O(n).\n\nNesting alone does NOT imply O(n²): bound the TOTAL movement of the inner pointer, not its worst case per outer step.",
+    tags: ["complexity", "amortized", "two-pointers", "sliding-window"],
+    source: "drill-1 (LC209) 2026-06-26",
+    created: "2026-06-26"
+  },
+  {
+    id: "read-trap-at-least-vs-exactly",
+    category: "Tips & Heuristics",
+    front: "Constraint-reading trap: a problem says subarray sum “≥ target” (at least). What breaks if you encode it as “== target” (exactly)?",
+    back: "It becomes a different problem. “At least” is a THRESHOLD: the moment the window sum crosses target you have a valid candidate — record it, then shrink while still ≥ target to minimize. “Exactly” misses every window that overshoots target without landing on it.\n\nUnderline ≥ / ≤ / strictly / at-least in the prompt and encode the constraint exactly as written, before coding.",
+    tags: ["reading-comprehension", "constraints", "sliding-window"],
+    source: "drill-1 (LC209) 2026-06-26",
+    created: "2026-06-26"
   }
 ];
